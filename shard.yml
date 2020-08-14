@@ -1,0 +1,13 @@
+name: jenerator
+version: 1.0.0
+
+authors:
+  - D. Scott Boggs <scott@tams.tech>
+
+targets:
+  script:
+    main: src/script.cr
+
+crystal: 0.35.1
+
+license: MIT
