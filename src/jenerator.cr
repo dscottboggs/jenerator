@@ -97,9 +97,18 @@ class Jenerator
   end
 
   private def sanitize_key(key)
-    sanitized = key.gsub('@', '_').underscore
+    first = true
+    sanitized = key.gsub do |char|
+      char = char.downcase if first
+      first = false
+      next char if char.alphanumeric? || char == '_'
+      '_'
+    end
+    sanitized = "_" if sanitized.empty?
+    sanitized = '_' + sanitized if sanitized[0].number?
+    sanitized = sanitized.underscore # Convert camelCase or PascalCase
     if sanitized == key
-      {sanitized, ""}
+      {key, ""}
     else
       {sanitized, %{@[JSON::Field(key: "#{key}")]\n}}
     end
@@ -119,11 +128,11 @@ class Jenerator
 
   private def type_of_scalar(data) : Class.class
     case data
-    when .as_s?    then String
-    when .as_i?    then Int64
-    when .as_f?    then Float64
-    when .as_bool? then Bool
+    when .as_s? then String
+    when .as_i? then Int64
+    when .as_f? then Float64
     else
+      return Bool unless data.as_bool?.nil?
       begin
         data.as_nil
         Nil
