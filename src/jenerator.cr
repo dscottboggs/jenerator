@@ -2,22 +2,15 @@ require "compiler/crystal/formatter"
 require "json"
 
 class Jenerator
-  @result : String::Builder
+  @result : IO
   @type_is_class : Bool
 
-  def initialize(@type_is_class = true)
-    @result = String::Builder.new
+  def initialize(@type_is_class = true, @result = String::Builder.new)
     @result << %[require "json"\n\n]
   end
 
-  def self.process(data : IO | String, document_name = "document", type_is_class = true) : String
-    code = new(type_is_class).parse(data, document_name).to_s
-    begin
-      Crystal::Formatter.format code
-    rescue e : Crystal::SyntaxException
-      STDERR.puts "WARNING: invalid Crystal syntax encountered at line #{e.line_number} character #{e.column_number}: #{e.message}"
-      code
-    end
+  def self.process(data : IO | String, document_name : String | Path = "document", type_is_class = true, into output : IO = String::Builder.new) : String
+    new(type_is_class, output).parse(data, document_name.to_s).format
   end
 
   def parse(data received : IO | String, document_name = "document") : self
@@ -26,6 +19,23 @@ class Jenerator
       parse_mapping data.as_h # Must be a top-level mapping
     end
     self
+  end
+
+  def format
+    code = case @result
+           when String::Builder
+             @result.to_s
+           else
+             @result.rewind.gets_to_end || ""
+           end
+    begin
+      Crystal::Formatter.format code
+    rescue e : Crystal::SyntaxException
+      STDERR.puts "WARNING: invalid Crystal syntax encountered at line #{e.line_number} character #{e.column_number}: #{e.message}"
+      code
+    rescue e : IO::Error
+      raise Exception.new "can't use #{typeof(@result)} to write output to.", cause: e
+    end
   end
 
   def class?
@@ -144,6 +154,13 @@ class Jenerator
 
   # Can only be called once!
   def to_s : String
-    @result.to_s
+    case @result
+    when String::Builder then @result.to_s
+    else
+      pos = @result.tell
+      str = @result.rewind.gets_to_end
+      @result.seek pos
+      str
+    end
   end
 end
